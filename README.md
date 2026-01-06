@@ -34,8 +34,8 @@ Your submission should be a short PDF report (maximum five pages using the follo
 * A short section that describes how each team member contributed to the project.
 * URLs to videos demonstrating your developed functionalities on the real Robile platform (you can upload these videos anywhere, for example to Google Drive or YouTube). In the videos, make sure that you explicitly show that you are executing your components!
 
-The report should be uploaded to LEA before the submission deadline. The grading of the project will be done on the basis of this submission.
+The report should be uploaded to LEA before the submission deadline. 
 
 ## Demonstration
 
-After the submission deadline, each group will also need to present their results in a live demonstration. We will agree on a date for the demonstration at a later date. The live demonstration does not count towards the project grade; it is just there so that you get some live demo experience and so that we can discuss any concrete issues that you have faced in your implementations.
+After the submission deadline, each group will need to present their results in a live demonstration. The project will be graded during the demonstration, based on both the submitted report and the demonstration itself.  We will agree on a date for the demonstration at a later date.
