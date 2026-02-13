@@ -1,0 +1,18 @@
+# .github/workflows/mirror.yml
+name: Mirror to Personal Repo
+
+on: [push] # This triggers the action on every git push
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetches all history for all branches and tags
+          
+      - uses: yesolutions/mirror-action@master
+        with:
+          REMOTE: 'https://github.com/MarcoAtefCosman/autonomous-navigation-robile'
+          GIT_USERNAME: 'MarcoAtefCosman'
+          GIT_PASSWORD: ${{ secrets.YOUR_PERSONAL_REPO_PAT }}
