@@ -10,36 +10,35 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Debug information
+      - name: Verify secret exists
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Git branches:"
-          git branch -a
-          echo "Git remotes:"
-          git remote -v
-      
-      - name: Test token authentication
-        env:
-          TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
-        run: |
-          # Test token with GitHub API
-          echo "Testing token authentication..."
-          RESPONSE=$(curl -s -H "Authorization: token ${TOKEN}" \
-                         -H "Accept: application/vnd.github.v3+json" \
-                         https://api.github.com/user)
-          
-          if echo "$RESPONSE" | grep -q "login"; then
-            echo "✅ Token is valid!"
-            echo "Authenticated as: $(echo "$RESPONSE" | grep -o '"login": "[^"]*' | cut -d'"' -f4)"
+          if [ -n "${{ secrets.PERSONAL_REPO_TOKEN }}" ]; then
+            echo "✅ Secret is set"
+            # Show first 4 chars of token (safe for debugging)
+            TOKEN="${{ secrets.PERSONAL_REPO_TOKEN }}"
+            echo "Token prefix: ${TOKEN:0:4}..."
           else
-            echo "❌ Token is invalid or has insufficient permissions"
-            echo "Response: $RESPONSE"
+            echo "❌ Secret PERSONAL_REPO_TOKEN is not set"
             exit 1
           fi
       
-      - name: Push to personal repository
-        env:
-          TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
+      - name: Configure git
         run: |
-          git remote add personal https://MarcoAtefCosman:${TOKEN}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git
+          git config --global user.name "MarcoAtefCosman"
+          git config --global user.email "your-email@example.com"
+      
+      - name: Push to personal repo
+        run: |
+          # Add remote with token in URL - DIRECT reference
+          echo "Adding remote..."
+          git remote add personal https://MarcoAtefCosman:${{ secrets.PERSONAL_REPO_TOKEN }}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git
+          
+          # Verify remote
+          echo "Remote configured:"
+          git remote -v
+          
+          # Push everything
+          echo "Pushing to personal repository..."
           git push --tags --force --prune personal "refs/remotes/origin/*:refs/heads/*"
+          
+          echo "✅ Mirror completed successfully!"
