@@ -10,35 +10,30 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Verify secret exists
+      - name: Setup GitHub CLI
         run: |
-          if [ -n "${{ secrets.PERSONAL_REPO_TOKEN }}" ]; then
-            echo "✅ Secret is set"
-            # Show first 4 chars of token (safe for debugging)
-            TOKEN="${{ secrets.PERSONAL_REPO_TOKEN }}"
-            echo "Token prefix: ${TOKEN:0:4}..."
-          else
-            echo "❌ Secret PERSONAL_REPO_TOKEN is not set"
-            exit 1
-          fi
+          # Install GitHub CLI (usually pre-installed on GitHub runners)
+          sudo apt-get update
+          sudo apt-get install gh -y
       
-      - name: Configure git
+      - name: Authenticate with token
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
         run: |
-          git config --global user.name "MarcoAtefCosman"
-          git config --global user.email "your-email@example.com"
+          # Test authentication
+          gh auth status
+          gh repo view MarcoAtefCosman/autonomous-navigation-robile --json name || echo "Repo might not exist"
       
-      - name: Push to personal repo
+      - name: Mirror using git commands with explicit auth
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
         run: |
-          # Add remote with token in URL - DIRECT reference
-          echo "Adding remote..."
-          git remote add personal https://MarcoAtefCosman:${{ secrets.PERSONAL_REPO_TOKEN }}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git
+          # Clone the personal repo using token authentication
+          git clone https://MarcoAtefCosman:${GH_TOKEN}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git personal-repo
           
-          # Verify remote
-          echo "Remote configured:"
-          git remote -v
+          # Copy all objects from current repo
+          cd personal-repo
+          git fetch --tags --force ../ "refs/heads/*:refs/heads/*"
           
-          # Push everything
-          echo "Pushing to personal repository..."
-          git push --tags --force --prune personal "refs/remotes/origin/*:refs/heads/*"
-          
-          echo "✅ Mirror completed successfully!"
+          # Push everything back
+          git push --tags --force --prune origin "refs/heads/*"
