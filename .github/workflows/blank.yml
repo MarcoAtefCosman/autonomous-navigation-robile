@@ -10,6 +10,15 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Debug SSH key format
+        run: |
+          echo "SSH key starts with:"
+          echo "${{ secrets.MIRROR_SSH_PRIVATE_KEY }}" | head -n 1
+          echo "SSH key ends with:"
+          echo "${{ secrets.MIRROR_SSH_PRIVATE_KEY }}" | tail -n 1
+          echo "Number of lines in key:"
+          echo "${{ secrets.MIRROR_SSH_PRIVATE_KEY }}" | wc -l
+      
       - uses: pixta-dev/repository-mirroring-action@v1
         with:
           target_repo_url: git@github.com:MarcoAtefCosman/autonomous-navigation-robile.git
