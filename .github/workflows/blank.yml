@@ -10,30 +10,35 @@ jobs:
         with:
           fetch-depth: 0
       
-      - name: Setup GitHub CLI
-        run: |
-          # Install GitHub CLI (usually pre-installed on GitHub runners)
-          sudo apt-get update
-          sudo apt-get install gh -y
-      
-      - name: Authenticate with token
+      - name: Full mirror to personal repo
         env:
-          GH_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
+          TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
         run: |
-          # Test authentication
-          gh auth status
-          gh repo view MarcoAtefCosman/autonomous-navigation-robile --json name || echo "Repo might not exist"
-      
-      - name: Mirror using git commands with explicit auth
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_REPO_TOKEN }}
-        run: |
-          # Clone the personal repo using token authentication
-          git clone https://MarcoAtefCosman:${GH_TOKEN}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git personal-repo
+          # Configure git
+          git config --global user.name "MarcoAtefCosman"
+          git config --global user.email "your-email@example.com"
           
-          # Copy all objects from current repo
-          cd personal-repo
-          git fetch --tags --force ../ "refs/heads/*:refs/heads/*"
+          # Create a temporary directory for mirroring
+          mkdir -p /tmp/mirror
+          cd /tmp/mirror
           
-          # Push everything back
+          # Clone the personal repo as a bare repository
+          echo "Cloning personal repo..."
+          git clone --bare https://MarcoAtefCosman:${TOKEN}@github.com/MarcoAtefCosman/autonomous-navigation-robile.git
+          
+          # Go into the bare repo
+          cd autonomous-navigation-robile.git
+          
+          # Fetch everything from the source repo
+          echo "Fetching from source..."
+          git fetch --tags --force /home/runner/work/amr-ws25-projects-amr-ws26-perception/amr-ws25-projects-amr-ws26-perception "refs/heads/*:refs/heads/*"
+          
+          # Push everything back to personal repo
+          echo "Pushing to personal repo..."
           git push --tags --force --prune origin "refs/heads/*"
+          
+          echo "✅ Mirror completed successfully!"
+          
+          # Clean up
+          cd /
+          rm -rf /tmp/mirror
