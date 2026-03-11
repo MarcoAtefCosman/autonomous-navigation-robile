@@ -71,10 +71,10 @@ class PotentialFieldPlanner(Node):
         self.has_odom = False
         self.latest_scan = None
 
-        # Stukc to local minima
-        self.stuck_counter = 0
-        self.prev_x = 0
-        self.prev_y = 0
+        # # Stukc to local minima
+        # self.stuck_counter = 0
+        # self.prev_x = 0
+        # self.prev_y = 0
 
         # Timer for control loop to publish velocity at fixed rate 10 hz
         self.control_timer = self.create_timer(0.1, self.control_loop) 
@@ -115,25 +115,25 @@ class PotentialFieldPlanner(Node):
             return
         
         # Apply random walks to overcome local minima
-        movement = math.hypot(self.curr_x - self.prev_x, self.curr_y - self.prev_y)
-        self.prev_x = self.curr_x
-        self.prev_y = self.curr_y
+        # movement = math.hypot(self.curr_x - self.prev_x, self.curr_y - self.prev_y)
+        # self.prev_x = self.curr_x
+        # self.prev_y = self.curr_y
         
-        if movement < 0.01:
-            self.stuck_counter += 1
-        else:
-            self.stuck_counter = 0
+        # if movement < 0.01:
+        #     self.stuck_counter += 1
+        # else:
+        #     self.stuck_counter = 0
         
-        if self.stuck_counter > self.stuck_threshold:
-            self.get_logger().warn('Stuck detected! apply random perturbation')
-            cmd_vel = Twist()
+        # if self.stuck_counter > self.stuck_threshold:
+        #     self.get_logger().warn('Stuck detected! apply random perturbation')
+        #     cmd_vel = Twist()
 
-            cmd_vel.linear.x = float(np.random.uniform(-0.2, 0.2))
-            cmd_vel.linear.y = float(np.random.uniform(-0.2, 0.2))
-            cmd_vel.angular.z = float(np.random.uniform(-0.5, 0.5))
-            self.cmd_pub.publish(cmd_vel)
-            self.stuck_counter = 0
-            return
+        #     cmd_vel.linear.x = float(np.random.uniform(-0.2, 0.2))
+        #     cmd_vel.linear.y = float(np.random.uniform(-0.2, 0.2))
+        #     cmd_vel.angular.z = float(np.random.uniform(-0.5, 0.5))
+        #     self.cmd_pub.publish(cmd_vel)
+        #     self.stuck_counter = 0
+        #     return
 
         # Compute attractive and repulsive forces
         f_attr_x, f_attr_y = self.compute_attractive_force(goal_x, goal_y)
