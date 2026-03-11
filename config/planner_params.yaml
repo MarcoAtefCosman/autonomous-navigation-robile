@@ -1,0 +1,66 @@
+# Potential Field Planner Parameters
+potential_field_planner:
+  ros__parameters:
+    # Force gains
+    ka: 1.5                    # Attractive gain 
+    kr: 0.3                    # Repulsive gain 
+    k_angular: 0.4             # Angular gain 
+
+    # Obstacle influence
+    rho_0: 0.3              
+
+    # Goal
+    goal_tolerance: 0.25       # Slightly more forgiving for reaching goals
+
+    # Speed limits
+    max_linear_speed: 0.3     # Moderate speed for indoor navigation
+    max_angular_speed: 0.5     # Moderate turning speed
+
+    # Performance
+    scan_subsample: 3          # Use every 3rd beam 
+
+    # Robile is omnidirectional
+    use_omnidirectional: True
+
+    # Forces arrows
+    pub_markers: False
+
+astar_planner:
+  ros__parameters:
+    inflation_radius: 7
+    rdp_epsilon: 0.3
+    max_waypoint_spacing: 1.5
+    use_eight_connected: true
+
+planner_coordinator:
+  ros__parameters:
+    waypoint_reached_tolerance: 0.3   # meters — how close before advancing to next waypoint
+    stuck_timeout: 10.0               # seconds without progress before skipping waypoint 
+
+particle_filter:
+  ros__parameters:
+    # Particle count
+    num_particles: 500            # more = accurate but slower
+    num_beams: 100                 # subsampled laser beams for update
+
+    # Laser
+    max_laser_range: 10.0         # meters
+
+    # Sensor model
+    sigma_hit: 0.2                # measurement noise std dev (meters)
+                                  # smaller = stricter matching, faster convergence
+                                  # larger = more tolerant, slower convergence
+
+    # Motion model noise (odometry noise parameters)
+    alpha1: 0.1                   # rotation noise from rotation
+    alpha2: 0.05                  # rotation noise from translation
+    alpha3: 0.1                   # translation noise from translation
+    alpha4: 0.05                  # translation noise from rotation
+
+    # Resampling
+    resample_threshold: 0.5       # resample when ESS < threshold * num_particles
+    random_particle_ratio: 0.05   # 5% random particles on resample (kidnap recovery)
+
+    # Update triggers
+    update_min_distance: 0.1      # min movement before running update (meters)
+    update_min_angle: 0.1         # min rotation before running update (radians)
