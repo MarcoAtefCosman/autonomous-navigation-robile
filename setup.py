@@ -26,6 +26,7 @@ setup(
             'astar_planner = amr_perception.astar_planner:main',
             'planner_coordinator = amr_perception.planner_coordinator:main',
             'particle_filter = amr_perception.particle_filter:main',
+            'frontier_explorer = amr_perception.frontier_explorer:main',
         ],
     },
 )

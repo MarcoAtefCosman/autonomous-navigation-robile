@@ -71,10 +71,10 @@ class PotentialFieldPlanner(Node):
         self.has_odom = False
         self.latest_scan = None
 
-        # # Stukc to local minima
-        # self.stuck_counter = 0
-        # self.prev_x = 0
-        # self.prev_y = 0
+        # Stukc to local minima
+        self.stuck_counter = 0
+        self.prev_x = 0
+        self.prev_y = 0
 
         # Timer for control loop to publish velocity at fixed rate 10 hz
         self.control_timer = self.create_timer(0.1, self.control_loop) 
