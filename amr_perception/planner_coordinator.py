@@ -35,8 +35,9 @@ class PlannerCoordinator(Node):
 
         # Subscribers
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.navigation_goal_callback, 10)
+        self.exploration_goal_sub = self.create_subscription(PoseStamped, '/exploration_goal', self.exploration_goal_callback, 10)
         self.waypoints_sub = self.create_subscription(Path, '/waypoints', self.waypoints_callback, 10)
-        self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.goal_reached_callback, 10)
+        self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.waypoint_reached_callback, 10)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
 
         # Publishers
@@ -83,6 +84,20 @@ class PlannerCoordinator(Node):
         self.plan_request_pub.publish(msg)
         self.get_logger().info(f'Sent plan request to A* planner')
 
+    def exploration_goal_callback(self, msg):
+        """Handle exploration goals from frontier explorer."""
+        self.final_goal = (msg.pose.position.x, msg.pose.position.y)
+        # self.is_exploring = True
+        self.get_logger().info(f'New EXPLORATION goal: ({self.final_goal[0]:.2f}, {self.final_goal[1]:.2f})')
+
+        # Reset state but keep exploration flag
+        self.waypoints = []
+        self.current_waypoint_index = 0
+        self.is_navigating = False
+
+        # Forward to A* planner
+        self.plan_request_pub.publish(msg)
+    
     def waypoints_callback(self,msg):
         """
         Recieve waypoints from A* planner.
@@ -104,7 +119,7 @@ class PlannerCoordinator(Node):
         # Send the waypoint
         self.send_current_waypoint()
     
-    def goal_reached_callback(self,msg):
+    def waypoint_reached_callback(self,msg):
         """
         The PF reports that it reached the current waypoint.
         advance to the next one

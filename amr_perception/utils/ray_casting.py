@@ -44,7 +44,7 @@ class RayCaster:
             if not self.map_utils.is_in_bounds(check_x, check_y):
                 return self.max_range
 
-            # Hit an obstacle
+            # Hit an obstacle ,- expected measurement
             if self.map_utils.is_occupied(check_x, check_y):
                 return step * self.resolution
 
