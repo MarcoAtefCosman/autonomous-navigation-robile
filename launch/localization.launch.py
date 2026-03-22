@@ -40,7 +40,7 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('amr_perception')
     config_file = os.path.join(pkg_share, 'config', 'planner_params.yaml')
 
-    # ── 1. Gazebo with Robile + RViz ─────────────────────────────
+    # 1. Gazebo with Robile + RViz 
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -51,7 +51,7 @@ def generate_launch_description():
         )
     )
 
-    # ── 2. Particle Filter ───────────────────────────────────────
+    # 2. Particle Filter 
     particle_filter_node = Node(
         package='amr_perception',
         executable='particle_filter',

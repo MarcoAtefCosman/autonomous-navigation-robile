@@ -2,24 +2,26 @@
 """"
 - Planner coordinator for robile platform
 
-- Recieves a navigation goal from RViz, forwards it to A* for planning,
+- Recieves a navigation goal from RViz or Frontier explorer, forwards it to A* for planning,
   then feeds waypoints one at a time to the potential field.
+- Uses TF to get robot pose in map frame
 
-- Subscribes to:
-    /clicked_goal (from RViz)
-    /waypoints (path from A* planner)
-    /goal_reached (Bool from PF Planner)
-    /odom (for current position monitoring)
-- Publishes :
-    /plan_request (PoseStamped to A* planner)
-    /goal_pose (PoseStamped to PF planner)
+Topics:
+    Subscribes: /goal_pose (RViz), /exploration_goal (frontier explorer),
+                /waypoints (A* planner), /goal_reached (PF planner)
+    Publishes:  /plan_request (to A*), /waypoint_goal (to PF planner),
+                /coordinator_markers (RViz)
 """
+
 import rclpy
 from rclpy.node import Node
-from nav_msgs.msg import Path, Odometry
+from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray
+import tf2_ros
+from tf2_ros import Buffer, TransformListener
+from tf_transformations import quaternion_from_euler
 import math
 
 class PlannerCoordinator(Node):
@@ -27,18 +29,21 @@ class PlannerCoordinator(Node):
         super().__init__('planner_coordinator')
     
         # Declare parameters
-        self.declare_parameter('waypoint_reached_tolerance', 0.3)
         self.declare_parameter('stuck_timeout', 10.0)
-
-        self.waypoint_tolerance = self.get_parameter('waypoint_reached_tolerance').value
+        self.declare_parameter('waypoint_reached_tolerance', 0.3)
+        
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
+        self.waypoint_tolerance = self.get_parameter('waypoint_reached_tolerance').value
+       
+        # TF2
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Subscribers
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.navigation_goal_callback, 10)
         self.exploration_goal_sub = self.create_subscription(PoseStamped, '/exploration_goal', self.exploration_goal_callback, 10)
         self.waypoints_sub = self.create_subscription(Path, '/waypoints', self.waypoints_callback, 10)
         self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.waypoint_reached_callback, 10)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
 
         # Publishers
         self.plan_request_pub = self.create_publisher(PoseStamped, '/plan_request', 10)
@@ -50,24 +55,39 @@ class PlannerCoordinator(Node):
         self.current_waypoint_index = 0
         self.final_goal = None
         self.is_navigating = False
-        self.curr_x = 0.0
-        self.curr_y = 0.0
 
         # Stuck detection
         self.last_progress_time = self.get_clock().now()
         self.last_distance = float('inf')
 
-        # Monitr time
-        self.create_timer(1.0, self.monitor_progress)
+        # Monitor time : tune the timer
+        self.create_timer(1, self.monitor_progress)
 
-        self.get_logger().info('Planner Coordinator initialized')
+        self.get_logger().info('Planner Coordinator node initialized')
 
+    def get_robot_pose_in_map(self):
+        """
+        Look up the robot's current pose in the map frame via TF.
+        Returns (x, y) or None if transform is unavailable.
+        """
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                'map','base_footprint',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5)
+            )
+            x = transform.transform.translation.x
+            y = transform.transform.translation.y
+            return x, y
+        except tf2_ros.LookupException:
+            self.get_logger().warn('TF lookup failed: map -> base_footprint not available yet')
+        except tf2_ros.ExtrapolationException as e:
+            self.get_logger().warn(f'TF extrapolation error: {e}')
+        except Exception as e:
+            self.get_logger().warn(f'TF error: {e}')
+        return None
+        
     # Callbacks
-    def odom_callback(self, msg):
-        """Track current robot position."""
-        self.curr_x = msg.pose.pose.position.x
-        self.curr_y = msg.pose.pose.position.y
-
     def navigation_goal_callback(self,msg):
         """
         Recieve a new navigation goal from RViz, forward it to A* as a plan request 
@@ -82,21 +102,21 @@ class PlannerCoordinator(Node):
 
         # Forward to A* planner
         self.plan_request_pub.publish(msg)
-        self.get_logger().info(f'Sent plan request to A* planner')
+        self.get_logger().info(f'Sent plan request to A* planner, according to RViz goal')
 
     def exploration_goal_callback(self, msg):
-        """Handle exploration goals from frontier explorer."""
+        """Handle exploration goals from frontier explorer, forward it to A* as a plan request"""
         self.final_goal = (msg.pose.position.x, msg.pose.position.y)
-        # self.is_exploring = True
         self.get_logger().info(f'New EXPLORATION goal: ({self.final_goal[0]:.2f}, {self.final_goal[1]:.2f})')
 
-        # Reset state but keep exploration flag
+        # Reset state 
         self.waypoints = []
         self.current_waypoint_index = 0
         self.is_navigating = False
 
         # Forward to A* planner
         self.plan_request_pub.publish(msg)
+        self.get_logger().info(f'Sent plan request to A* planner, according to exploration goal')
     
     def waypoints_callback(self,msg):
         """
@@ -116,31 +136,33 @@ class PlannerCoordinator(Node):
         self.last_progress_time = self.get_clock().now()
         self.last_distance = float('inf')
 
-        # Send the waypoint
+        # Send the waypoint to the PF
         self.send_current_waypoint()
     
     def waypoint_reached_callback(self,msg):
         """
         The PF reports that it reached the current waypoint.
-        advance to the next one
+        advance to the next waypoint.
         """
         if not self.is_navigating or not msg.data:
             return
         
         self.get_logger().info(f'waypoint {self.current_waypoint_index+1}/{len(self.waypoints)} reached!')
-
+        
+        if self.current_waypoint_index == len(self.waypoints)-1:
+            self.get_logger().info('NAVIGATION IS COMPLETE')
+            self.is_navigating = False
+            self.publish_status_markers()
+            return
+         
         self.current_waypoint_index += 1
         self.last_progress_time = self.get_clock().now()
         self.last_distance = float('inf')
 
-        if self.current_waypoint_index < len(self.waypoints):
-            self.send_current_waypoint()
-        else:
-            self.get_logger().info('NAVIGATION IS COMPLETE')
-            self.is_navigating = False
-            self.publish_status_markers()
+        self.send_current_waypoint()
+
     
-    # Waypoint managements
+    # Waypoint management
     def send_current_waypoint(self):
         """
         Publish the current waypoint to /goal_pose for the PF planner
@@ -155,11 +177,18 @@ class PlannerCoordinator(Node):
 
         goal_msg.pose.position.x = wx
         goal_msg.pose.position.y = wy
+        
+        heading = 0
+        quat = quaternion_from_euler(0, 0, heading)
         goal_msg.pose.orientation.w = 1.0
-
-        self.goal_pose_pub.publish(goal_msg)
+        goal_msg.pose.orientation.x = quat[0]
+        goal_msg.pose.orientation.y = quat[1]
+        goal_msg.pose.orientation.z = quat[2]
+        goal_msg.pose.orientation.w = quat[3]
+        
         self.get_logger().info(f'Sending waypoint {self.current_waypoint_index + 1}' f'/{len(self.waypoints)}: ({wx:.2f}, {wy:.2f})')
-
+        self.goal_pose_pub.publish(goal_msg)
+        
         self.publish_status_markers()
     
     # Progress monitoring
@@ -173,24 +202,16 @@ class PlannerCoordinator(Node):
         if self.current_waypoint_index >= len(self.waypoints):
             return
         
+        robot_pose = self.get_robot_pose_in_map()
+        if robot_pose is None:
+            self.get_logger().warn('Cannot get robot pose in map frame, skipping plan request')
+            return
+        
+        curr_x, curr_y = robot_pose
         wx, wy = self.waypoints[self.current_waypoint_index]
-        distance = math.hypot(wx - self.curr_x, wy - self.curr_y)
+        
+        distance = math.hypot(wx - curr_x, wy - curr_y)
         now = self.get_clock().now()
-
-        # Check if making progress
-        if distance < self.waypoint_tolerance:
-            self.get_logger().info(f'Waypoint {self.current_waypoint_index + 1}/{len(self.waypoints)} reached (coordinator backup)')
-            self.current_waypoint_index += 1
-            self.last_progress_time = now
-            self.last_distance = float('inf')
-
-            if self.current_waypoint_index < len(self.waypoints):
-                self.send_current_waypoint()
-            else:
-                self.get_logger().info('NAVIGATION IS COMPLETE')
-                self.is_navigating = False
-                self.publish_status_markers()
-            return   
         
         # Check if making progress
         if distance < self.last_distance - 0.05:
@@ -204,7 +225,8 @@ class PlannerCoordinator(Node):
             self.current_waypoint_index += 1
             self.last_progress_time = now
             self.last_distance = float('inf')
-
+            
+            # Skip current waypoint
             if self.current_waypoint_index < len(self.waypoints):
                 self.send_current_waypoint()
             else:
@@ -219,6 +241,7 @@ class PlannerCoordinator(Node):
                     self.plan_request_pub.publish(replan_msg)
                     self.is_navigating = False          
 
+    
     # Visualization
     def publish_status_markers(self):
         """Show current waypoint target and progress in RViz."""
@@ -251,27 +274,6 @@ class PlannerCoordinator(Node):
             target.color.b = 1.0
             target.color.a = 0.6
             markers.markers.append(target)
-
-            # Progress text
-            text = Marker()
-            text.header.frame_id = 'map'
-            text.header.stamp = stamp
-            text.ns = 'progress'
-            text.id = 1
-            text.type = Marker.TEXT_VIEW_FACING
-            text.action = Marker.ADD
-            text.pose.position.x = self.curr_x
-            text.pose.position.y = self.curr_y
-            text.pose.position.z = 1.0
-            text.pose.orientation.w = 1.0
-            text.scale.z = 0.25
-            text.color.r = 1.0
-            text.color.g = 1.0
-            text.color.b = 1.0
-            text.color.a = 1.0
-            text.text = (f'WP {self.current_waypoint_index + 1}'
-                        f'/{len(self.waypoints)}')
-            markers.markers.append(text)
 
         self.status_marker_pub.publish(markers)
 

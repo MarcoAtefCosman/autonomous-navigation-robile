@@ -34,13 +34,13 @@ def generate_launch_description():
         )
     )
 
-    # Static TF 
-    static_tf = Node(
+    static_tf_map_odom = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
         arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
         output='screen'
     )
+
 
     astar_node = Node(
         package='amr_perception',
@@ -68,7 +68,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         gazebo_launch,
-        static_tf,
+        static_tf_map_odom,
         astar_node,
         coordinator_node,
         pf_node,

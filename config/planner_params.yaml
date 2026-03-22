@@ -1,45 +1,37 @@
-# ═══════════════════════════════════════════════════════════════
 # Potential Field Planner Parameters
-# ═══════════════════════════════════════════════════════════════
 potential_field_planner:
   ros__parameters:
     ka: 1.5
     kr: 0.3
     k_angular: 0.4
-    rho_0: 0.3
+    rho_0: 0.6
     goal_tolerance: 0.25
+    smoothing_factor: 0.3
     max_linear_speed: 0.3
     max_angular_speed: 0.5
     scan_subsample: 3
     use_omnidirectional: true
-    pub_markers: false
 
-# ═══════════════════════════════════════════════════════════════
 # A* Planner Parameters
-# ═══════════════════════════════════════════════════════════════
 astar_planner:
   ros__parameters:
-    inflation_radius: 7
+    inflation_radius: 3
     rdp_epsilon: 0.3
     max_waypoint_spacing: 1.5
     use_eight_connected: true
 
-# ═══════════════════════════════════════════════════════════════
 # Planner Coordinator Parameters
-# ═══════════════════════════════════════════════════════════════
 planner_coordinator:
   ros__parameters:
+    stuck_timeout: 15.0
     waypoint_reached_tolerance: 0.3
-    stuck_timeout: 10.0
 
-# ═══════════════════════════════════════════════════════════════
 # Particle Filter (MCL) Parameters
-# ═══════════════════════════════════════════════════════════════
 particle_filter:
   ros__parameters:
     num_particles: 500
-    num_beams: 20
-    max_laser_range: 10.0
+    num_beams: 60
+    max_laser_range: 15.0
     sigma_hit: 0.2
     alpha1: 0.1
     alpha2: 0.05
@@ -49,16 +41,3 @@ particle_filter:
     random_particle_ratio: 0.05
     update_min_distance: 0.1
     update_min_angle: 0.1
-
-# ═══════════════════════════════════════════════════════════════
-# Frontier Explorer Parameters
-# ═══════════════════════════════════════════════════════════════
-frontier_explorer:
-  ros__parameters:
-    min_frontier_size: 5          # minimum cells to count as a valid frontier
-    exploration_rate: 2.0         # seconds between exploration cycles
-    distance_weight: 1.0          # ranking weight for distance (closer = better)
-    size_weight: 2.0              # ranking weight for frontier size (larger = better)
-    goal_reached_tolerance: 0.5   # meters to consider frontier reached
-    blacklist_radius: 0.5         # meters — don't revisit failed frontiers
-    max_failed_attempts: 3        # attempts before blacklisting a frontier
