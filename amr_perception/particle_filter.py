@@ -522,7 +522,7 @@ class ParticleFilter(Node):
         t.transform.rotation.y = tf_quat[1]
         t.transform.rotation.z = tf_quat[2]
         t.transform.rotation.w = tf_quat[3]
-        # self.tf_broadcaster.sendTransform(t)
+        self.tf_broadcaster.sendTransform(t)
 
     def publish_particles(self):
         """Publish particle cloud for RViz."""

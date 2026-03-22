@@ -48,6 +48,13 @@ def generate_launch_description():
         )
     )
 
+    static_tf_fallback = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+        output='screen'
+    )
+
     # ── 2. Particle Filter (provides map->odom TF) ──────────────
     # NO static_transform_publisher for map->odom here!
     particle_filter_node = Node(
@@ -55,7 +62,7 @@ def generate_launch_description():
         executable='particle_filter',
         name='particle_filter',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     # ── 3. A* Planner ────────────────────────────────────────────
@@ -64,7 +71,8 @@ def generate_launch_description():
         executable='astar_planner',
         name='astar_planner',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}],
+        
     )
 
     # ── 4. Planner Coordinator ───────────────────────────────────
@@ -73,7 +81,7 @@ def generate_launch_description():
         executable='planner_coordinator',
         name='planner_coordinator',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     # ── 5. Potential Field Planner ───────────────────────────────
@@ -82,11 +90,12 @@ def generate_launch_description():
         executable='potential_field_planner',
         name='potential_field_planner',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     return LaunchDescription([
         gazebo_launch,
+        static_tf_fallback,
         particle_filter_node,
         astar_node,
         coordinator_node,

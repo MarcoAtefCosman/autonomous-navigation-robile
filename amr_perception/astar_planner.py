@@ -1,10 +1,10 @@
 #!usr/bin/env python3
-
 """
 - A* planner for robile platform
 
-- Subscribes to /map and /plan_request (goal), runs A* on the occupancy grid.
-- extract waypoints using RDP Simplification and publishes results.
+Topics:
+    Subscribes: /map (OccupancyGrid), /plan_request (PoseStamped)
+    Publishes:  /planned_path (Path), /waypoints (Path), /waypoint_markers (MarkerArray)
 """
 
 import rclpy
@@ -13,6 +13,8 @@ from nav_msgs.msg import OccupancyGrid,Path, Odometry
 from geometry_msgs.msg import PoseStamped, PoseArray, Pose
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
+import tf2_ros
+from tf2_ros import Buffer, TransformListener
 from tf_transformations import euler_from_quaternion
 import heapq
 import math
@@ -34,10 +36,13 @@ class AStarPlanner(Node):
         self.max_waypoint_spacing = self.get_parameter('max_waypoint_spacing').value
         self.use_eight_connected = self.get_parameter('use_eight_connected').value
 
+        # TF2
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         # Subscribers
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.goal_sub = self.create_subscription(PoseStamped, '/plan_request', self.goal_callback, 10)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
 
         # Publishers
         self.raw_path_pub = self.create_publisher(Path, '/planned_path', 10)
@@ -46,54 +51,88 @@ class AStarPlanner(Node):
 
         # State
         self.map_utils = None
-        self.has_odom = False
-        self.curr_x = 0.0
-        self.curr_y = 0.0
 
         self.get_logger().info('A* Planner node initialized')
 
+    def get_robot_pose_in_map(self):
+        """
+        Look up the robot's current pose in the map frame via TF.
+        Returns (x, y) or None if transform is unavailable.
+        """
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                'map',
+                'base_footprint',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5)
+            )
+            x = transform.transform.translation.x
+            y = transform.transform.translation.y
+            return x, y
+        except tf2_ros.LookupException:
+            self.get_logger().warn('TF lookup failed: map -> base_footprint not available yet')
+        except tf2_ros.ExtrapolationException as e:
+            self.get_logger().warn(f'TF extrapolation error: {e}')
+        except Exception as e:
+            self.get_logger().warn(f'TF error: {e}')
+        return None
+
     # Callbacks
-    def odom_callback(self,msg):
-        """Update current pose from odometry."""
-        self.curr_x = msg.pose.pose.position.x
-        self.curr_y = msg.pose.pose.position.y
-        self.has_odom = True
-    
     def map_callback(self,msg):
         """Recieve and process the occupancy grid map"""
         self.map_utils = MapUtils(msg)
         self.map_utils.inflate_obstacles(self.inflation_radius)
         self.get_logger().info(f'Map received: {self.map_utils.width}x{self.map_utils.height}, resolution={self.map_utils.resolution}m')
     
-    def goal_callback(self,msg):
-        """Recieve a goal and plan a path to it"""
-        if self.map_utils is None or not self.has_odom:
-            self.get_logger().warn('No map recieved / no odomoetry information available...')
+    def goal_callback(self, msg):
+        """Receive a goal and plan a path to it."""
+        if self.map_utils is None:
+            self.get_logger().warn('No map received yet, cannot plan')
             return
 
+        robot_pose = self.get_robot_pose_in_map()
+        if robot_pose is None:
+            self.get_logger().warn('Cannot get robot pose in map frame, skipping plan request')
+            return
+
+        curr_x, curr_y = robot_pose
         goal_x = msg.pose.position.x
         goal_y = msg.pose.position.y
 
-        # Grid coordinates
-        start_grid = self.map_utils.world_to_grid(self.curr_x, self.curr_y)
-        goal_grid = self.map_utils.world_to_grid(goal_x, goal_y)
-        
-        # Validate start and goal
-        if not self.map_utils.is_in_bounds(*start_grid):
-            self.get_logger().error('Start position is outside map bounds')
-            return
+        # Log map info for debugging
+        self.get_logger().info(
+            f'Planning: robot=({curr_x:.2f},{curr_y:.2f}), goal=({goal_x:.2f},{goal_y:.2f}), '
+            f'map origin=({self.map_utils.origin_x:.2f},{self.map_utils.origin_y:.2f}), '
+            f'map size={self.map_utils.width}x{self.map_utils.height}, '
+            f'res={self.map_utils.resolution}'
+        )
+
+        start_grid = self.map_utils.world_to_grid(curr_x, curr_y)
+        goal_grid  = self.map_utils.world_to_grid(goal_x,  goal_y)
+
         if not self.map_utils.is_in_bounds(*goal_grid):
-            self.get_logger().error('Goal position is outside map bounds')
+            self.get_logger().error(
+                f'Goal grid {goal_grid} outside map bounds — skipping')
             return
+
+        if self.map_utils.is_occupied(*start_grid):
+            self.get_logger().warn('Start cell is occupied in inflated map, finding nearest free...')
+            start_grid = self.nearest_free(start_grid)
+            if start_grid is None:
+                self.get_logger().error('No free cell near start — skipping')
+                return
+
         if self.map_utils.is_occupied(*goal_grid):
             self.get_logger().error('Goal is inside an obstacle')
+            self.publish_path([], self.waypoint_path_pub)  # unblock explorer
             return
     
         # Run A*
         grid_path = self.astar(start_grid, goal_grid)
 
         if grid_path is None:
-            self.get_logger().error('A* failed to find a path')
+            self.get_logger().error('A* failed to find a path — publishing empty path to unblock explorer')
+            self.publish_path([], self.waypoint_path_pub)  # signal failure to coordinator
             return
         
         self.get_logger().info(f'A* found a path with length {len(grid_path)}')
