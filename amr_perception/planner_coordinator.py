@@ -29,7 +29,7 @@ class PlannerCoordinator(Node):
         super().__init__('planner_coordinator')
     
         # Declare parameters
-        self.declare_parameter('stuck_timeout', 10.0)
+        self.declare_parameter('stuck_timeout', 15.0)
         self.declare_parameter('waypoint_reached_tolerance', 0.3)
         
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
@@ -72,7 +72,8 @@ class PlannerCoordinator(Node):
         """
         try:
             transform = self.tf_buffer.lookup_transform(
-                'map','base_footprint',
+                'map',
+                'base_footprint',
                 rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.5)
             )

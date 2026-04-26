@@ -26,8 +26,8 @@ class AStarPlanner(Node):
         super().__init__('astar_planner')
 
         # Declare parameters
-        self.declare_parameter('inflation_radius', 3)   # cells to inflate around obstacles
-        self.declare_parameter('rdp_epsilon', 0.3)  # RDP simplification tolerance 
+        self.declare_parameter('inflation_radius', 3)       # cells to inflate around obstacles
+        self.declare_parameter('rdp_epsilon', 0.3)          # RDP simplification tolerance 
         self.declare_parameter('max_waypoint_spacing', 1.5) # max distance between waypoints
         self.declare_parameter('use_eight_connected', True)
 
@@ -82,7 +82,7 @@ class AStarPlanner(Node):
         """Recieve and process the occupancy grid map"""
         self.map_utils = MapUtils(msg)
         self.map_utils.inflate_obstacles(self.inflation_radius)
-        self.get_logger().info(f'Map received: {self.map_utils.width}x{self.map_utils.height}, resolution={self.map_utils.resolution}m')
+        self.get_logger().info(f'Map received: {self.map_utils.width}x{self.map_utils.height}, resolution={self.map_utils.resolution:.3f}m')
     
     def goal_callback(self, msg):
         """Receive a goal and plan a path to it."""
@@ -99,12 +99,12 @@ class AStarPlanner(Node):
         goal_x = msg.pose.position.x
         goal_y = msg.pose.position.y
 
-        # Log map info for debugging
+        # Log map 
         self.get_logger().info(
             f'Planning: robot=({curr_x:.2f},{curr_y:.2f}), goal=({goal_x:.2f},{goal_y:.2f}), '
             f'map origin=({self.map_utils.origin_x:.2f},{self.map_utils.origin_y:.2f}), '
             f'map size={self.map_utils.width}x{self.map_utils.height}, '
-            f'res={self.map_utils.resolution}'
+            f'res={self.map_utils.resolution:.3f}'
         )
 
         start_grid = self.map_utils.world_to_grid(curr_x, curr_y)

@@ -64,9 +64,9 @@ class PotentialFieldPlanner(Node):
         self.goal_reached_pub = self.create_publisher(Bool, '/goal_reached', 10)
  
         # State
-        self.curr_x = 0.0
-        self.curr_y = 0.0
-        self.curr_theta = 0.0
+        self.curr_x = None
+        self.curr_y = None
+        self.curr_theta = None
         self.has_pose = False
         self.goal = None
         self.latest_scan = None
@@ -88,7 +88,8 @@ class PotentialFieldPlanner(Node):
         """
         try:
             transform = self.tf_buffer.lookup_transform(
-                'map','base_footprint',
+                'map',
+                'base_footprint',
                 rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.5)
             )
@@ -135,8 +136,10 @@ class PotentialFieldPlanner(Node):
         f_attr_x, f_attr_y = self.compute_attractive_force(goal_x, goal_y)
         f_rep_x, f_rep_y = self.compute_repulsive_force(self.latest_scan)
 
-        f_tot_x = f_attr_x + f_rep_x
-        f_tot_y = f_attr_y + f_rep_y
+        # Reduce repulsion influence near the goal
+        goal_proximity_scale = min(1.0, distance_to_goal / (2.0 * self.goal_tolerance))
+        f_tot_x = f_attr_x + goal_proximity_scale * f_rep_x
+        f_tot_y = f_attr_y + goal_proximity_scale * f_rep_y
 
         # Transform to robot velocity
         cmd_vel = Twist()
@@ -151,7 +154,7 @@ class PotentialFieldPlanner(Node):
             raw_x = float(np.clip(local_x, -self.max_linear_speed, self.max_linear_speed))
             raw_y = float(np.clip(local_y, -self.max_linear_speed, self.max_linear_speed))
 
-            desired_heading = math.atan2(goal_y - self.curr_y, goal_x - self.curr_x)
+            desired_heading = math.atan2(f_tot_y, f_tot_x)
             heading_error = self.normalize_angle(desired_heading - self.curr_theta)
             raw_z = float(np.clip(self.k_angular * heading_error, -self.max_angular_speed, self.max_angular_speed))
 
@@ -193,8 +196,10 @@ class PotentialFieldPlanner(Node):
         if dist < 1e-3:
             return 0.0, 0.0
 
-        f_attr_x = self.ka * (dx / dist)
-        f_attr_y = self.ka * (dy / dist)
+        magnitude = min(self.ka * dist, self.ka)
+
+        f_attr_x = magnitude * (dx / dist)
+        f_attr_y = magnitude * (dy / dist)
 
         return f_attr_x, f_attr_y    
 
@@ -229,6 +234,7 @@ class PotentialFieldPlanner(Node):
 
             # Repulsive force magnitude: kr * (1/dist - 1/rho_0) * (1/dist^2)
             magnitude = self.kr * (1.0/dist - 1.0/self.rho_0) * (1.0 / dist**2)
+            # magnitude = min(magnitude, 2.0 * self.ka)
 
             f_rep_x += magnitude * (dx / dist)
             f_rep_y += magnitude * (dy / dist)
