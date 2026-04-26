@@ -41,16 +41,3 @@ particle_filter:
     random_particle_ratio: 0.05
     update_min_distance: 0.1
     update_min_angle: 0.1
-
-
-frontier_explorer:
-  ros__parameters:
-    min_frontier_size: 5          # min cells to count as a valid frontier cluster
-    exploration_rate: 3.0         # seconds between exploration cycles
-    distance_weight: 1.0          # closer frontiers preferred
-    size_weight: 2.0              # larger frontiers preferred (more info gain)
-    goal_reached_tolerance: 0.5   # meters to consider frontier reached
-    blacklist_radius: 0.5         # meters — don't revisit nearby failed goals
-    max_failed_attempts: 3        # attempts before blacklisting
-    min_goal_distance: 0.3        # ignore frontiers closer than this
-    navigation_timeout: 30.0      # seconds before giving up on a frontier
