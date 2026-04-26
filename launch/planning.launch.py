@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-Launch file for planning only (no localization).
-Uses static identity map->odom TF.
-
-Pre-requisites:
-  ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=$HOME/ros2_ws/src/amr_perception/maps/sim_map.yaml -p use_sim_time:=true
-  ros2 lifecycle set /map_server configure
-  ros2 lifecycle set /map_server activate
-
-Usage:
-  ros2 launch amr_perception planning.launch.py
-"""
-
 import os
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription

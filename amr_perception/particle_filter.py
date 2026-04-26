@@ -9,7 +9,6 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from nav_msgs.msg import OccupancyGrid, Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseStamped, PoseArray, Pose, TransformStamped
-from tf2_ros import TransformBroadcaster
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 import numpy as np
 import math
@@ -23,7 +22,7 @@ class ParticleFilter(Node):
         super().__init__('particle_filter')
 
         # Parameters
-        self.declare_parameter('num_particles', 1500)
+        self.declare_parameter('num_particles', 500)
         self.declare_parameter('num_subsampling_beams', 50)
         self.declare_parameter('max_laser_range', 10.0)
         self.declare_parameter('sigma_hit', 0.15)
@@ -82,7 +81,6 @@ class ParticleFilter(Node):
         # Publishers
         self.particle_pub = self.create_publisher(PoseArray, '/particle_cloud', 10)
         self.pose_pub = self.create_publisher(PoseStamped, '/mcl_pose', 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
 
         # State
         self.map_utils = None
@@ -127,7 +125,6 @@ class ParticleFilter(Node):
         self.get_logger().info('Particle Filter initialized')
 
     # Callbacks
-
     def map_callback(self, msg):
         """Receive the map. Wait for first odom before initializing."""
         self.map_msg = msg
@@ -286,10 +283,6 @@ class ParticleFilter(Node):
             rot1_noise = self.alpha1 * abs(rot1) + self.alpha2 * distance
             trans_noise = self.alpha3 * distance + self.alpha4 * (abs(rot1) + abs(rot2))
             rot2_noise = self.alpha1 * abs(rot2) + self.alpha2 * distance
-
-            # noisy_rot1 = rot1 + np.random.normal(0, max(rot1_noise, 1e-4))
-            # noisy_trans = distance + np.random.normal(0, max(trans_noise, 1e-4))
-            # noisy_rot2 = rot2 + np.random.normal(0, max(rot2_noise, 1e-4))
 
             noisy_rot1 = rot1 + np.random.normal(0, rot1_noise)
             noisy_trans = distance + np.random.normal(0, trans_noise)
@@ -504,25 +497,6 @@ class ParticleFilter(Node):
         pose_msg.pose.orientation.z = quat[2]
         pose_msg.pose.orientation.w = quat[3]
         self.pose_pub.publish(pose_msg)
-
-        # TF: map -> odom
-        dtheta = self.normalize_angle(self.estimated_theta - self.odom_theta)
-        cos_dt = math.cos(dtheta)
-        sin_dt = math.sin(dtheta)
-
-        t = TransformStamped()
-        t.header.stamp = stamp
-        t.header.frame_id = 'map'
-        t.child_frame_id = 'odom'
-        t.transform.translation.x = self.estimated_x - (cos_dt * self.odom_x - sin_dt * self.odom_y)
-        t.transform.translation.y = self.estimated_y - (sin_dt * self.odom_x + cos_dt * self.odom_y)
-        t.transform.translation.z = 0.0
-        tf_quat = quaternion_from_euler(0, 0, dtheta)
-        t.transform.rotation.x = tf_quat[0]
-        t.transform.rotation.y = tf_quat[1]
-        t.transform.rotation.z = tf_quat[2]
-        t.transform.rotation.w = tf_quat[3]
-        self.tf_broadcaster.sendTransform(t)
 
     def publish_particles(self):
         """Publish particle cloud for RViz."""
