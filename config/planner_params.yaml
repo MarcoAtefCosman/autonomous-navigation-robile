@@ -4,11 +4,11 @@ potential_field_planner:
     ka: 1.5
     kr: 0.3
     k_angular: 0.4
-    rho_0: 0.6
+    rho_0: 0.5
     goal_tolerance: 0.25
     smoothing_factor: 0.3
-    max_linear_speed: 0.3
-    max_angular_speed: 0.5
+    max_linear_speed: 0.2
+    max_angular_speed: 0.25
     scan_subsample: 3
     use_omnidirectional: true
 

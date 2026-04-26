@@ -1,4 +1,3 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/zAxyEtqr)
 # AMR Project
 
 ## Project Objectives
@@ -9,7 +8,7 @@ We will particularly use the Robile platform during the project; you are already
 
 ## Task Description
 
-The project consists of three parts that are building on each other: (i) path and motion planning, (ii) localisation, and (iii) environment exploration.
+The project consists of three parts that are building on each other: (i) path and motion planning, (ii) localisation
 
 ### 1. Path and Motion Planning
 
@@ -19,24 +18,9 @@ You have already implemented a *potential field planner* in one of your assignme
 
 In one of the course lectures, we discussed Monte Carlo localisation as a practical solution to the robot localisation problem in an existing map. In this second part of the project, your objective is to implement your very own particle filter that you then integrate on the Robile. You should implement the simple version of the filter that we discussed in the lecture; however, if you have time and interest, you are free to additionally explore extensions / improvements to the algorithm, for example in the form of the adaptive Monte Carlo approach that we mentioned in the lecture.
 
-### 3. Environment Exploration
-
-The final objective of the project is to incorporate an environment exploration functionality to the robot. This will have to be combined with a SLAM component, namely you will need your exploration component to select poses to explore and a SLAM component that will take care of actually creating a map. The exploration algorithm should ideally select poses at the map fringe (i.e. poses that are at the boundary between the explored and unexplored region), but you are free to explore different pose selection strategies in your implementation.
-
 # Practical Notes and Assumptions
 * For the first two tasks in this project, we need an environment map to be given. For this purpose, you should use an already existing SLAM approach in ROS (such as the `slam_toolbox` that you also used to map simulated environments) to create a map of the environment where you conduct your tests.
 * In the first task of the project, you will use a grid map to find a global task plan; however, this plan will be too granular to be integrated with the potential field planner, as every grid cell on the path will be considered an intermediate goal. To improve this, you need to post-process your path so that you extract a number of representative waypoints along the path; these will then be the intermediate goals of your potential field planner. How exactly you decide to post-process the path is up to you; for instance, you can take every n-th cell along the path as a waypoint (where n is predefined), or you can develop a smarter strategy and extract waypoints at important points along the path (e.g. sharp points).
 * You should also use an existing SLAM approach for the last part of the project, such that this will need to run in parallel with the exploration component. The selection of poses should thus be done with respect to the most up-to-date map provided by the SLAM algorithm.
 
-## Submission Guidelines
 
-Your submission should be a short PDF report (maximum five pages using the following template: https://github.com/a2s-institute/rnd-project-report), where you briefly describe your approach for the different tasks. In the report, make sure to include:
-* A URL of a repository with all the code that you have developed during the project. Make sure that the repository contains a README file to explain the contents of the repository and provide short usage guidelines.
-* A short section that describes how each team member contributed to the project.
-* URLs to videos demonstrating your developed functionalities on the real Robile platform (you can upload these videos anywhere, for example to Google Drive or YouTube). In the videos, make sure that you explicitly show that you are executing your components!
-
-The report should be uploaded to LEA before the submission deadline. 
-
-## Demonstration
-
-After the submission deadline, each group will need to present their results in a live demonstration. The project will be graded during the demonstration, based on both the submitted report and the demonstration itself.  We will agree on a date for the demonstration at a later date.

@@ -37,7 +37,7 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('amr_perception')
     config_file = os.path.join(pkg_share, 'config', 'planner_params.yaml')
 
-    # ── 1. Gazebo with Robile + RViz ─────────────────────────────
+    # 1. Gazebo with Robile + RViz 
     gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -55,42 +55,41 @@ def generate_launch_description():
         output='screen'
     )
 
-    # ── 2. Particle Filter (provides map->odom TF) ──────────────
-    # NO static_transform_publisher for map->odom here!
+    # 2. Particle Filter (provides map->odom TF) 
     particle_filter_node = Node(
         package='amr_perception',
         executable='particle_filter',
         name='particle_filter',
         output='screen',
-        parameters=[config_file, {'use_sim_time': True}]
+        parameters=[config_file]
     )
 
-    # ── 3. A* Planner ────────────────────────────────────────────
+    # 3. A* Planner 
     astar_node = Node(
         package='amr_perception',
         executable='astar_planner',
         name='astar_planner',
         output='screen',
-        parameters=[config_file, {'use_sim_time': True}],
+        parameters=[config_file],
         
     )
 
-    # ── 4. Planner Coordinator ───────────────────────────────────
+    # 4. Planner Coordinator 
     coordinator_node = Node(
         package='amr_perception',
         executable='planner_coordinator',
         name='planner_coordinator',
         output='screen',
-        parameters=[config_file, {'use_sim_time': True}]
+        parameters=[config_file]
     )
 
-    # ── 5. Potential Field Planner ───────────────────────────────
+    # 5. Potential Field Planner 
     pf_node = Node(
         package='amr_perception',
         executable='potential_field_planner',
         name='potential_field_planner',
         output='screen',
-        parameters=[config_file, {'use_sim_time': True}]
+        parameters=[config_file]
     )
 
     return LaunchDescription([
