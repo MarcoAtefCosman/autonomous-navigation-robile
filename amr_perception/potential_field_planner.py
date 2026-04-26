@@ -15,10 +15,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from geometry_msgs.msg import Twist, PoseStamped
+from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool
-import tf2_ros
-from tf2_ros import Buffer, TransformListener
 from tf_transformations import euler_from_quaternion
 import numpy as np
 import math
@@ -50,15 +49,12 @@ class PotentialFieldPlanner(Node):
         self.scan_subsample = self.get_parameter('scan_subsample').value
         self.use_omnidirectional = self.get_parameter('use_omnidirectional').value
         
-        # TF2
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        
         # Subscribers
         qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT) # ROS2 QoS profile
         self.scan_sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos)
         self.goal_sub = self.create_subscription(PoseStamped, '/waypoint_goal', self.goal_callback, 10)
-
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)     
+        
         # Publishers
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.goal_reached_pub = self.create_publisher(Bool, '/goal_reached', 10)
@@ -80,31 +76,18 @@ class PotentialFieldPlanner(Node):
         self.control_timer = self.create_timer(0.1, self.control_loop) 
         
         self.get_logger().info('Potential Field Planner node initialized')
+    
+    # Callbacks    
+    def odom_callback(self, msg):
+        """Process odometry."""
+        q = msg.pose.pose.orientation
+        _, _, theta = euler_from_quaternion([q.x, q.y, q.z, q.w])
 
-    def get_robot_pose_in_map(self):
-        """
-        Look up the robot's current pose in the map frame via TF.
-        Returns (x, y) or None if transform is unavailable.
-        """
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                'map',
-                'base_footprint',
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.5)
-            )
-            self.curr_x = transform.transform.translation.x
-            self.curr_y = transform.transform.translation.y
-            q = transform.transform.rotation
-            _, _, self.curr_theta = euler_from_quaternion([q.x, q.y, q.z, q.w])
-            self.has_pose = True
-        except tf2_ros.LookupException:
-            self.get_logger().warn('TF lookup failed: map -> base_footprint not available yet')
-        except tf2_ros.ExtrapolationException as e:
-            self.get_logger().warn(f'TF extrapolation error: {e}')
-        except Exception as e:
-            self.get_logger().warn(f'TF error: {e}')
-        
+        self.curr_x = msg.pose.pose.position.x
+        self.curr_y = msg.pose.pose.position.y
+        self.curr_theta = theta    
+        self.has_pose = True
+    
     def scan_callback(self, msg):
         """Store latest laser scan for the control loop."""
         self.latest_scan = msg        
@@ -116,8 +99,6 @@ class PotentialFieldPlanner(Node):
     
     def control_loop(self):
         """Main control loop: compute forces and publish cmd_vel, runnin at fixed rate."""
-        self.get_robot_pose_in_map()
-
         if self.goal is None or not self.has_pose or self.latest_scan is None:
             return  
         
