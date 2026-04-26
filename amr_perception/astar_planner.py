@@ -36,14 +36,10 @@ class AStarPlanner(Node):
         self.max_waypoint_spacing = self.get_parameter('max_waypoint_spacing').value
         self.use_eight_connected = self.get_parameter('use_eight_connected').value
 
-        # TF2
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-
         # Subscribers
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.goal_sub = self.create_subscription(PoseStamped, '/plan_request', self.goal_callback, 10)
-
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)     
         # Publishers
         self.raw_path_pub = self.create_publisher(Path, '/planned_path', 10)
         self.waypoint_path_pub = self.create_publisher(Path, '/waypoints', 10)
@@ -51,33 +47,24 @@ class AStarPlanner(Node):
 
         # State
         self.map_utils = None
+        self.curr_x = None
+        self.curr_y = None
+        self.curr_theta = None
+        self.has_pose = False    
 
         self.get_logger().info('A* Planner node initialized')
 
-    def get_robot_pose_in_map(self):
-        """
-        Look up the robot's current pose in the map frame via TF.
-        Returns (x, y) or None if transform is unavailable.
-        """
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                'map',
-                'base_footprint',
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.5)
-            )
-            x = transform.transform.translation.x
-            y = transform.transform.translation.y
-            return x, y
-        except tf2_ros.LookupException:
-            self.get_logger().warn('TF lookup failed: map -> base_footprint not available yet')
-        except tf2_ros.ExtrapolationException as e:
-            self.get_logger().warn(f'TF extrapolation error: {e}')
-        except Exception as e:
-            self.get_logger().warn(f'TF error: {e}')
-        return None
-
     # Callbacks
+    def odom_callback(self, msg):
+        """Process odometry."""
+        q = msg.pose.pose.orientation
+        _, _, theta = euler_from_quaternion([q.x, q.y, q.z, q.w])
+
+        self.curr_x = msg.pose.pose.position.x
+        self.curr_y = msg.pose.pose.position.y
+        self.curr_theta = theta    
+        self.has_pose = True
+
     def map_callback(self,msg):
         """Recieve and process the occupancy grid map"""
         self.map_utils = MapUtils(msg)
@@ -90,24 +77,22 @@ class AStarPlanner(Node):
             self.get_logger().warn('No map received yet, cannot plan')
             return
 
-        robot_pose = self.get_robot_pose_in_map()
-        if robot_pose is None:
+        if not self.has_pose:
             self.get_logger().warn('Cannot get robot pose in map frame, skipping plan request')
             return
-
-        curr_x, curr_y = robot_pose
+        # curr_x, curr_y = robot_pose
         goal_x = msg.pose.position.x
         goal_y = msg.pose.position.y
 
         # Log map 
         self.get_logger().info(
-            f'Planning: robot=({curr_x:.2f},{curr_y:.2f}), goal=({goal_x:.2f},{goal_y:.2f}), '
+            f'Planning: robot=({self.curr_x:.2f},{self.curr_y:.2f}), goal=({goal_x:.2f},{goal_y:.2f}), '
             f'map origin=({self.map_utils.origin_x:.2f},{self.map_utils.origin_y:.2f}), '
             f'map size={self.map_utils.width}x{self.map_utils.height}, '
             f'res={self.map_utils.resolution:.3f}'
         )
 
-        start_grid = self.map_utils.world_to_grid(curr_x, curr_y)
+        start_grid = self.map_utils.world_to_grid(self.curr_x, self.curr_y)
         goal_grid  = self.map_utils.world_to_grid(goal_x,  goal_y)
 
         if not self.map_utils.is_in_bounds(*goal_grid):

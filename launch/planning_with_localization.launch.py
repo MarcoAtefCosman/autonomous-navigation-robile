@@ -52,7 +52,8 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
-        output='screen'
+        output='screen',
+        parameters=[{'use_sim_time': True}]
     )
 
     # 2. Particle Filter (provides map->odom TF) 
@@ -61,7 +62,7 @@ def generate_launch_description():
         executable='particle_filter',
         name='particle_filter',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     # 3. A* Planner 
@@ -70,7 +71,7 @@ def generate_launch_description():
         executable='astar_planner',
         name='astar_planner',
         output='screen',
-        parameters=[config_file],
+        parameters=[config_file, {'use_sim_time': True}]
         
     )
 
@@ -80,7 +81,7 @@ def generate_launch_description():
         executable='planner_coordinator',
         name='planner_coordinator',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     # 5. Potential Field Planner 
@@ -89,7 +90,7 @@ def generate_launch_description():
         executable='potential_field_planner',
         name='potential_field_planner',
         output='screen',
-        parameters=[config_file]
+        parameters=[config_file, {'use_sim_time': True}]
     )
 
     return LaunchDescription([

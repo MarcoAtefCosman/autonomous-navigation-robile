@@ -15,13 +15,11 @@ Topics:
 
 import rclpy
 from rclpy.node import Node
-from nav_msgs.msg import Path
+from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray
-import tf2_ros
-from tf2_ros import Buffer, TransformListener
-from tf_transformations import quaternion_from_euler
+from tf_transformations import quaternion_from_euler, euler_from_quaternion
 import math
 
 class PlannerCoordinator(Node):
@@ -35,22 +33,24 @@ class PlannerCoordinator(Node):
         self.stuck_timeout = self.get_parameter('stuck_timeout').value
         self.waypoint_tolerance = self.get_parameter('waypoint_reached_tolerance').value
        
-        # TF2
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Subscribers
         self.goal_sub = self.create_subscription(PoseStamped, '/goal_pose', self.navigation_goal_callback, 10)
         self.exploration_goal_sub = self.create_subscription(PoseStamped, '/exploration_goal', self.exploration_goal_callback, 10)
         self.waypoints_sub = self.create_subscription(Path, '/waypoints', self.waypoints_callback, 10)
         self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.waypoint_reached_callback, 10)
-
+        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)     
+        
         # Publishers
         self.plan_request_pub = self.create_publisher(PoseStamped, '/plan_request', 10)
         self.goal_pose_pub = self.create_publisher(PoseStamped, '/waypoint_goal', 10)
         self.status_marker_pub = self.create_publisher(MarkerArray, '/coordinator_markers', 10)
 
         # State
+        self.curr_x = None
+        self.curr_y = None
+        self.curr_theta = None
+        self.has_pose = False
         self.waypoints = []
         self.current_waypoint_index = 0
         self.final_goal = None
@@ -64,31 +64,18 @@ class PlannerCoordinator(Node):
         self.create_timer(1, self.monitor_progress)
 
         self.get_logger().info('Planner Coordinator node initialized')
-
-    def get_robot_pose_in_map(self):
-        """
-        Look up the robot's current pose in the map frame via TF.
-        Returns (x, y) or None if transform is unavailable.
-        """
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                'map',
-                'base_footprint',
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.5)
-            )
-            x = transform.transform.translation.x
-            y = transform.transform.translation.y
-            return x, y
-        except tf2_ros.LookupException:
-            self.get_logger().warn('TF lookup failed: map -> base_footprint not available yet')
-        except tf2_ros.ExtrapolationException as e:
-            self.get_logger().warn(f'TF extrapolation error: {e}')
-        except Exception as e:
-            self.get_logger().warn(f'TF error: {e}')
-        return None
         
     # Callbacks
+    def odom_callback(self, msg):
+        """Process odometry."""
+        q = msg.pose.pose.orientation
+        _, _, theta = euler_from_quaternion([q.x, q.y, q.z, q.w])
+
+        self.curr_x = msg.pose.pose.position.x
+        self.curr_y = msg.pose.pose.position.y
+        self.curr_theta = theta    
+        self.has_pose = True
+
     def navigation_goal_callback(self,msg):
         """
         Recieve a new navigation goal from RViz, forward it to A* as a plan request 
@@ -203,15 +190,13 @@ class PlannerCoordinator(Node):
         if self.current_waypoint_index >= len(self.waypoints):
             return
         
-        robot_pose = self.get_robot_pose_in_map()
-        if robot_pose is None:
+        if not self.has_pose:
             self.get_logger().warn('Cannot get robot pose in map frame, skipping plan request')
             return
-        
-        curr_x, curr_y = robot_pose
+
         wx, wy = self.waypoints[self.current_waypoint_index]
         
-        distance = math.hypot(wx - curr_x, wy - curr_y)
+        distance = math.hypot(wx - self.curr_x, wy - self.curr_y)
         now = self.get_clock().now()
         
         # Check if making progress
