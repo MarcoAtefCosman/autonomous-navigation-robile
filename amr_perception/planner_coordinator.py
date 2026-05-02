@@ -40,6 +40,7 @@ class PlannerCoordinator(Node):
         self.waypoints_sub = self.create_subscription(Path, '/waypoints', self.waypoints_callback, 10)
         self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.waypoint_reached_callback, 10)
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)     
+        self.mcl_sub = self.create_subscription(PoseStamped, '/mcl_pose', self.mcl_callback, 10)
         
         # Publishers
         self.plan_request_pub = self.create_publisher(PoseStamped, '/plan_request', 10)
@@ -51,6 +52,10 @@ class PlannerCoordinator(Node):
         self.curr_y = None
         self.curr_theta = None
         self.has_pose = False
+
+        self.curr_mcl_x = None
+        self.curr_mcl_y = None
+
         self.waypoints = []
         self.current_waypoint_index = 0
         self.final_goal = None
@@ -75,6 +80,11 @@ class PlannerCoordinator(Node):
         self.curr_y = msg.pose.pose.position.y
         self.curr_theta = theta    
         self.has_pose = True
+    
+    def mcl_callback(self, msg):
+        """Process mcl pose."""
+        self.curr_mcl_x = msg.pose.position.x
+        self.curr_mcl_y = msg.pose.position.y
 
     def navigation_goal_callback(self,msg):
         """
@@ -134,8 +144,6 @@ class PlannerCoordinator(Node):
         """
         if not self.is_navigating or not msg.data:
             return
-        
-        self.get_logger().info(f'waypoint {self.current_waypoint_index+1}/{len(self.waypoints)} reached!')
         
         if self.current_waypoint_index == len(self.waypoints)-1:
             self.get_logger().info('NAVIGATION IS COMPLETE')
