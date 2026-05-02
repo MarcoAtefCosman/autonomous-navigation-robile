@@ -481,9 +481,6 @@ class ParticleFilter(Node):
         mean_sin = np.average(np.sin(self.particles[:, 2]), weights=self.weights)
         self.estimated_theta = math.atan2(mean_sin, mean_cos)
 
-        # Estimated weighted pose
-        self.get_logger().info(f'Estimated Robot pose : x = {self.estimated_x:.3f}, y = {self.estimated_y:.3f},'
-                               f'heading = {(self.estimated_theta*180/np.pi):.3f}')
         
         # PoseStamped
         pose_msg = PoseStamped()

@@ -11,15 +11,12 @@ def generate_launch_description():
     pkg_share = get_package_share_directory('amr_perception')
     config_file = os.path.join(pkg_share, 'config', 'planner_params.yaml')
 
-    # 1. Gazebo with Robile + RViz 
-    gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory('robile_gazebo'),
-                'launch',
-                'gazebo_4_wheel.launch.py'
-            )
-        )
+
+    static_tf_map = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0','0','0','0','0','0','map','odom'],
+        output = 'screen'
     )
 
     particle_filter_node = Node(
@@ -31,6 +28,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        gazebo_launch,
+        # gazebo_launch,
+        static_tf_map,
         particle_filter_node,
     ])

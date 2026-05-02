@@ -100,8 +100,10 @@ class PotentialFieldPlanner(Node):
     def control_loop(self):
         """Main control loop: compute forces and publish cmd_vel, runnin at fixed rate."""
         if self.goal is None or not self.has_pose or self.latest_scan is None:
+            self.get_logger().info('failed to initialize goal loop!!')
             return  
         
+        self.get_logger().info('Initialized goal loop!!')
         goal_x, goal_y = self.goal
 
         # Check if goal is reached
@@ -161,7 +163,9 @@ class PotentialFieldPlanner(Node):
         self.prev_cmd_x = cmd_vel.linear.x
         self.prev_cmd_y = cmd_vel.linear.y
         self.prev_cmd_z = cmd_vel.angular.z
- 
+
+        self.get_logger().info(f'cmd velocity : ({cmd_vel.linear.x :.2f}, {cmd_vel.linear.y :.2f}, {cmd_vel.angular.z :.2f})')
+        
         self.cmd_pub.publish(cmd_vel)
 
 
